@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TDMH Staff Portal - Digital Admission</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .hidden { display: none !important; }
+        
+        /* Premium Medical Theme */
+        .glass-header { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
+        
+        /* Drawing Canvases */
+        .drawing-pad { border: 2px dashed #cbd5e1; border-radius: 0.75rem; background-color: white; cursor: crosshair; touch-action: none; width: 100%; max-width: 400px; height: 300px; display: block; margin: 0 auto; }
+        .sig-pad { border: 2px solid #e2e8f0; border-radius: 0.5rem; background-color: white; cursor: crosshair; touch-action: none; width: 100%; height: 150px; }
+        
+        /* Spinners & Animations */
+        .spinner { border: 4px solid rgba(37, 99, 235, 0.1); border-left-color: #2563eb; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .pulse-dot { width: 10px; height: 10px; background-color: #10b981; border-radius: 50%; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+
+        /* Review Data Formatting */
+        .data-label { @apply text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block; }
+        .data-value { @apply text-base font-semibold text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100; }
+    </style>
+</head>
+<body class="text-gray-800 pb-20">
+
+    <!-- OVERLAY: LOADING -->
+    <div id="global-loader" class="fixed inset-0 bg-white/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden">
+        <div class="spinner mb-4 w-12 h-12"></div>
+        <p id="loader-text" class="text-xl font-bold text-blue-800">Processing...</p>
+    </div>
+
+    <!-- VIEW 1: LOGIN SCREEN -->
+    <div id="view-login" class="min-h-screen flex items-center justify-center p-4 bg-slate-100">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center border-t-4 border-blue-600">
+            <img src="images logo/tdmh-logo.png" alt="TDMH Logo" class="h-20 mx-auto mb-6 object-contain" onerror="this.onerror=null; this.outerHTML='<div class=\'text-2xl font-bold text-blue-700 mb-6\'>TAYTAY DOCTORS<br><span class=\'text-sm text-gray-500\'>MULTISPECIALTY HOSPITAL</span></div>'">
+            <h1 class="text-2xl font-black text-gray-800 mb-2">Staff Portal</h1>
+            <p class="text-gray-500 mb-8 text-sm">Authorized Medical Personnel Only</p>
+            
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="mb-4 text-left">
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Username</label>
+                    <input type="text" id="username" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50">
+                </div>
+                <div class="mb-6 text-left">
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Password</label>
+                    <input type="password" id="password" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition">Secure Login</button>
+                <p id="login-error" class="text-red-500 text-sm font-bold mt-4 hidden">Invalid Credentials. Try again.</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- VIEW 2: LIVE QUEUE DASHBOARD -->
+    <div id="view-dashboard" class="hidden">
+        <header class="glass-header shadow-sm sticky top-0 z-40 border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center">
+                    <img src="images logo/tdmh-logo.png" alt="TDMH Logo" class="h-10 object-contain mr-4" onerror="this.style.display='none'">
+                    <div>
+                        <h1 class="text-xl font-bold text-blue-800">Live Admission Queue</h1>
+                        <div class="flex items-center mt-0.5"><div class="pulse-dot mr-2"></div><span class="text-xs font-bold text-emerald-600 uppercase">System Active</span></div>
+                    </div>
+                </div>
+                <button onclick="logout()" class="text-sm font-bold text-gray-500 hover:text-red-600 transition">Logout</button>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 py-8">
+            <div class="bg-white rounded-xl card-shadow border border-gray-100 overflow-hidden">
+                <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-slate-50">
+                    <h2 class="font-bold text-gray-700">Patients Pending Examination</h2>
+                    <button onclick="fetchQueue()" class="text-blue-600 hover:text-blue-800 p-2 rounded-full hover:bg-blue-50 transition" title="Manual Refresh">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="bg-gray-100 text-gray-600 font-bold uppercase text-xs">
+                            <tr><th class="py-4 px-6">Time Submitted</th><th class="py-4 px-6">Case No.</th><th class="py-4 px-6">Patient Name</th><th class="py-4 px-6">Action</th></tr>
+                        </thead>
+                        <tbody id="queue-table-body" class="divide-y divide-gray-100">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="empty-queue" class="p-12 text-center hidden">
+                    <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                    <p class="text-gray-500 font-medium">No pending patients. Queue is clear.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- VIEW 3: DOCTOR'S CHART EXAM -->
+    <div id="view-exam" class="hidden">
+        <header class="glass-header shadow-sm sticky top-0 z-40 border-b border-gray-200">
+            <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
+                <button onclick="closeExam()" class="flex items-center text-gray-600 hover:text-blue-600 font-bold transition">
+                    <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg> Back to Queue
+                </button>
+                <div class="text-right">
+                    <div class="text-sm font-bold text-gray-500">Evaluating Patient:</div>
+                    <div id="exam-patient-name" class="text-lg font-black text-blue-800 leading-tight">---</div>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-5xl mx-auto px-4 py-8 space-y-8">
+            
+            <!-- SECTION: PATIENT/NURSE DATA REVIEW -->
+            <section class="bg-white p-6 md:p-8 rounded-xl card-shadow border border-blue-100">
+                <div class="flex items-center mb-6 border-b border-gray-100 pb-4">
+                    <svg class="w-6 h-6 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    <h2 class="text-xl font-black text-gray-800">1. Pre-Admission Data Review</h2>
+                </div>
+                
+                <div class="bg-blue-50/50 p-4 rounded-lg border border-blue-100 mb-6">
+                    <h3 class="text-sm font-black text-blue-800 uppercase tracking-widest mb-3">Vitals (Nurse Encoded)</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div><span class="data-label">Weight</span><div id="rev-weight" class="data-value bg-white"></div></div>
+                        <div><span class="data-label">BP</span><div id="rev-bp" class="data-value bg-white text-red-600 font-black"></div></div>
+                        <div><span class="data-label">PR</span><div id="rev-pr" class="data-value bg-white"></div></div>
+                        <div><span class="data-label">RR</span><div id="rev-rr" class="data-value bg-white"></div></div>
+                        <div><span class="data-label">Temp</span><div id="rev-temp" class="data-value bg-white"></div></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div><span class="data-label">Chief Complaint</span><div id="rev-cc" class="data-value text-red-600"></div></div>
+                    <div><span class="data-label">Case No.</span><div id="rev-caseno" class="data-value font-mono"></div></div>
+                </div>
+
+                <div class="bg-gray-100 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600 italic">Note: To view full medical history, ROS, and checklists, please refer to the master Google Sheet database. This view highlights critical information.</p>
+                </div>
+            </section>
+
+            <!-- SECTION: SENSORY & MOTOR DRAWING -->
+            <section class="bg-white p-6 md:p-8 rounded-xl card-shadow border border-indigo-100">
+                <div class="flex items-center justify-between mb-6 border-b border-gray-100 pb-4">
+                    <div class="flex items-center">
+                        <svg class="w-6 h-6 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        <h2 class="text-xl font-black text-gray-800">2. Sensory & Motor Mapping</h2>
+                    </div>
+                    <div class="text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">Draw directly on figures</div>
+                </div>
+
+                <!-- Canvas Tools -->
+                <div class="flex justify-center space-x-4 mb-4">
+                    <button type="button" onclick="setBrush('red')" class="w-8 h-8 rounded-full bg-red-500 ring-2 ring-offset-2 ring-red-500 shadow-sm" title="Red Pen"></button>
+                    <button type="button" onclick="setBrush('blue')" class="w-8 h-8 rounded-full bg-blue-600 shadow-sm" title="Blue Pen"></button>
+                    <button type="button" onclick="setBrush('black')" class="w-8 h-8 rounded-full bg-gray-900 shadow-sm" title="Black Pen"></button>
+                    <div class="w-px h-8 bg-gray-300 mx-2"></div>
+                    <button type="button" onclick="clearCanvases()" class="text-sm font-bold text-gray-500 hover:text-red-500">Clear Drawings</button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="text-center">
+                        <canvas id="canvas-sensory" class="drawing-pad shadow-inner bg-slate-50"></canvas>
+                        <p class="mt-3 font-bold text-gray-600 uppercase tracking-widest text-sm">Sensory</p>
+                    </div>
+                    <div class="text-center">
+                        <canvas id="canvas-motor" class="drawing-pad shadow-inner bg-slate-50"></canvas>
+                        <p class="mt-3 font-bold text-gray-600 uppercase tracking-widest text-sm">Motor</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: FINAL DIAGNOSIS & SIGNATURE -->
+            <section class="bg-amber-50 p-6 md:p-8 rounded-xl card-shadow border border-amber-200">
+                <div class="flex items-center mb-6 border-b border-amber-200 pb-4">
+                    <svg class="w-6 h-6 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                    <h2 class="text-xl font-black text-amber-900">3. Finalization & Signature</h2>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-black text-amber-900 mb-2 uppercase tracking-wide">Admitting Diagnosis <span class="text-red-500">*</span></label>
+                    <textarea id="admitting-diagnosis" required rows="3" class="w-full p-3 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 font-bold text-lg bg-white"></textarea>
+                </div>
+
+                <div class="mb-8">
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="block text-sm font-black text-amber-900 uppercase tracking-wide">Admitting Physician Signature <span class="text-red-500">*</span></label>
+                        <button type="button" onclick="clearSignature()" class="text-xs font-bold text-gray-500 hover:text-red-500">Clear</button>
+                    </div>
+                    <canvas id="canvas-signature" class="sig-pad shadow-inner"></canvas>
+                </div>
+
+                <!-- THE SECURITY GATE -->
+                <div class="bg-white p-6 rounded-lg border border-amber-200 shadow-sm mt-8">
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 text-gray-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        Digital Audit Verification
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 mb-1">Physician Full Name (e.g., Dr. Juan Santos)</label>
+                            <input type="text" id="auth-name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 mb-1">Master Authorization Password</label>
+                            <input type="password" id="auth-pass" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" onclick="submitFinalChart()" class="mt-8 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-xl shadow-lg transition transform hover:-translate-y-1 text-xl flex justify-center items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Securely Finalize Chart
+                </button>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION & STATE
+        // ==========================================
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyGRKChJjeMlhnOkPWr598UJE0I3l62uza528R4aRXc02RHI2dDM4YT0TO_HYjEr19Q4Q/exec';
+        let currentCreds = { user: '', pass: '' };
+        let activePatient = null;
+        let queueInterval = null;
+
+        // Canvas Contexts
+        let ctxSen, ctxMot, ctxSig;
+        let isDrawing = false;
+        let brushColor = '#ef4444'; // Default Red
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initCanvases();
+            // Check if already logged in via session
+            if(sessionStorage.getItem('tdmh_staff_logged')) {
+                currentCreds = JSON.parse(sessionStorage.getItem('tdmh_staff_logged'));
+                showView('view-dashboard');
+                fetchQueue();
+                startQueueAutoRefresh();
+            }
+        });
+
+        // ==========================================
+        // AUTH & NAVIGATION
+        // ==========================================
+        function showLoader(text) { document.getElementById('loader-text').innerText = text; document.getElementById('global-loader').classList.remove('hidden'); }
+        function hideLoader() { document.getElementById('global-loader').classList.add('hidden'); }
+        function showView(viewId) { ['view-login', 'view-dashboard', 'view-exam'].forEach(id => document.getElementById(id).classList.add('hidden')); document.getElementById(viewId).classList.remove('hidden'); window.scrollTo(0,0); }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('username').value, p = document.getElementById('password').value;
+            showLoader("Authenticating...");
+            try {
+                const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "verifyLogin", username: u, password: p }) });
+                const data = await res.json();
+                if(data.status === 'success') {
+                    currentCreds = { user: u, pass: p };
+                    sessionStorage.setItem('tdmh_staff_logged', JSON.stringify(currentCreds));
+                    document.getElementById('login-error').classList.add('hidden');
+                    showView('view-dashboard');
+                    fetchQueue(); startQueueAutoRefresh();
+                } else document.getElementById('login-error').classList.remove('hidden');
+            } catch(e) { alert("Network Error. Cannot connect to database."); }
+            hideLoader();
+        }
+
+        function logout() { sessionStorage.removeItem('tdmh_staff_logged'); clearInterval(queueInterval); window.location.reload(); }
+
+        // ==========================================
+        // QUEUE MANAGEMENT (SILENT FETCH)
+        // ==========================================
+        function startQueueAutoRefresh() { queueInterval = setInterval(fetchQueue, 15000); } // 15 seconds
+        
+        async function fetchQueue() {
+            try {
+                const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getPendingPatients", username: currentCreds.user, password: currentCreds.pass }) });
+                const data = await res.json();
+                if(data.status === 'success') renderQueue(data.data);
+                else if(data.message === "Unauthorized access") logout();
+            } catch(e) { console.log("Silent fetch failed (Network drop)"); }
+        }
+
+        let patientDataStore = {}; // Holds full patient JSONs
+        function renderQueue(patients) {
+            const tbody = document.getElementById('queue-table-body');
+            tbody.innerHTML = '';
+            if(patients.length === 0) { document.getElementById('empty-queue').classList.remove('hidden'); return; }
+            document.getElementById('empty-queue').classList.add('hidden');
+            
+            patients.forEach(p => {
+                patientDataStore[p.caseNo] = p.details; // Store for exam view
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-blue-50 transition border-b border-gray-100";
+                tr.innerHTML = `
+                    <td class="py-4 px-6 text-gray-500 font-medium whitespace-nowrap">${p.timestamp}</td>
+                    <td class="py-4 px-6 font-mono font-bold text-gray-800">${p.caseNo}</td>
+                    <td class="py-4 px-6 font-bold text-blue-900">${p.patientName}</td>
+                    <td class="py-4 px-6"><button onclick="openExam('${p.caseNo}', '${p.patientName}')" class="bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-md font-bold transition text-sm">Open Chart</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ==========================================
+        // EXAM VIEW & CANVAS LOGIC
+        // ==========================================
+        function openExam(caseNo, patientName) {
+            clearInterval(queueInterval); // Stop refreshing while doctor is working
+            activePatient = { caseNo: caseNo, name: patientName, data: patientDataStore[caseNo] };
+            
+            // Populate Review Data
+            document.getElementById('exam-patient-name').innerText = patientName;
+            document.getElementById('rev-caseno').innerText = caseNo;
+            document.getElementById('rev-cc').innerText = activePatient.data.chiefComplaints || "N/A";
+            
+            // Populate Vitals
+            document.getElementById('rev-weight').innerText = activePatient.data.peWeight || "--";
+            document.getElementById('rev-bp').innerText = activePatient.data.peBP || "--";
+            document.getElementById('rev-pr').innerText = activePatient.data.pePR || "--";
+            document.getElementById('rev-rr').innerText = activePatient.data.peRR || "--";
+            document.getElementById('rev-temp').innerText = activePatient.data.peTemp || "--";
+            
+            // Reset fields
+            document.getElementById('admitting-diagnosis').value = '';
+            document.getElementById('auth-name').value = '';
+            document.getElementById('auth-pass').value = '';
+            clearCanvases();
+            clearSignature();
+            
+            showView('view-exam');
+        }
+
+        function closeExam() { activePatient = null; showView('view-dashboard'); fetchQueue(); startQueueAutoRefresh(); }
+
+        // --- DRAWING PAD LOGIC ---
+        function initCanvases() {
+            const setupCanvas = (id) => {
+                const cvs = document.getElementById(id);
+                // Set internal resolution higher for smooth lines
+                cvs.width = cvs.clientWidth * 2; cvs.height = cvs.clientHeight * 2;
+                const ctx = cvs.getContext('2d');
+                ctx.scale(2,2); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                
+                // Event Listeners for Drawing
+                let drawing = false;
+                const getPos = (e) => {
+                    const rect = cvs.getBoundingClientRect();
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    return { x: clientX - rect.left, y: clientY - rect.top };
+                };
+                const start = (e) => { e.preventDefault(); drawing = true; ctx.beginPath(); const pos = getPos(e); ctx.moveTo(pos.x, pos.y); };
+                const draw = (e) => {
+                    if(!drawing) return; e.preventDefault();
+                    const pos = getPos(e); ctx.lineTo(pos.x, pos.y);
+                    ctx.strokeStyle = (id === 'canvas-signature') ? '#000000' : brushColor;
+                    ctx.lineWidth = (id === 'canvas-signature') ? 2 : 3;
+                    ctx.stroke();
+                };
+                const stop = (e) => { if(e) e.preventDefault(); drawing = false; ctx.closePath(); };
+                
+                cvs.addEventListener('mousedown', start); cvs.addEventListener('mousemove', draw);
+                cvs.addEventListener('mouseup', stop); cvs.addEventListener('mouseout', stop);
+                cvs.addEventListener('touchstart', start, {passive:false}); cvs.addEventListener('touchmove', draw, {passive:false});
+                cvs.addEventListener('touchend', stop);
+                
+                return ctx;
+            };
+
+            ctxSen = setupCanvas('canvas-sensory');
+            ctxMot = setupCanvas('canvas-motor');
+            ctxSig = setupCanvas('canvas-signature');
+            drawStickFigureTemplate();
+        }
+
+        function setBrush(color) { brushColor = color; }
+
+        function drawStickFigureTemplate() {
+            const drawFig = (ctx) => {
+                ctx.clearRect(0, 0, 400, 300);
+                ctx.beginPath(); ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2;
+                // Head
+                ctx.arc(100, 30, 20, 0, Math.PI * 2);
+                // Body
+                ctx.moveTo(100, 50); ctx.lineTo(100, 100);
+                // Shoulders & Arms (Angular per paper form)
+                ctx.moveTo(100, 60); ctx.lineTo(70, 60); ctx.lineTo(70, 80); ctx.lineTo(50, 80); // Left Arm
+                ctx.moveTo(100, 60); ctx.lineTo(130, 60); ctx.lineTo(130, 80); ctx.lineTo(150, 80); // Right Arm
+                // Hips & Legs
+                ctx.moveTo(70, 100); ctx.lineTo(130, 100);
+                ctx.moveTo(70, 100); ctx.lineTo(70, 140); // Left Leg
+                ctx.moveTo(130, 100); ctx.lineTo(130, 140); // Right Leg
+                ctx.stroke(); ctx.closePath();
+            };
+            drawFig(ctxSen); drawFig(ctxMot);
+        }
+
+        function clearCanvases() { drawStickFigureTemplate(); }
+        function clearSignature() { const cvs = document.getElementById('canvas-signature'); ctxSig.clearRect(0, 0, cvs.width, cvs.height); }
+
+        // ==========================================
+        // SUBMISSION & FINALIZATION
+        // ==========================================
+        async function submitFinalChart() {
+            const diag = document.getElementById('admitting-diagnosis').value;
+            const authName = document.getElementById('auth-name').value;
+            const authPass = document.getElementById('auth-pass').value;
+
+            if(!diag || !authName || !authPass) { alert("Error: Diagnosis, Physician Name, and Authorization Password are required to finalize."); return; }
+
+            // Compress Canvases to Base64 (0.5 quality saves massive database space)
+            const sensoryBase64 = document.getElementById('canvas-sensory').toDataURL('image/jpeg', 0.5);
+            const motorBase64 = document.getElementById('canvas-motor').toDataURL('image/jpeg', 0.5);
+            const sigBase64 = document.getElementById('canvas-signature').toDataURL('image/png', 0.8); // Sig needs clarity
+
+            // Create payload wrapping the drawings and diagnosis inside the original patient JSON
+            const updatedPatientData = activePatient.data;
+            updatedPatientData._doctorData = {
+                admittingDiagnosis: diag,
+                sensoryMap: sensoryBase64,
+                motorMap: motorBase64,
+                physicianSignature: sigBase64
+            };
+
+            showLoader("Finalizing Chart. Verifying Signature...");
+            try {
+                // We use the existing AppScript "updatePatientRecord" action
+                const payload = { action: "updatePatientRecord", staffName: authName, password: authPass, caseNo: activePatient.caseNo, updatedData: updatedPatientData, isFinalizing: true };
+                const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+                const data = await res.json();
+                
+                if(data.status === 'success') {
+                    alert("Chart Successfully Finalized and Saved to Database.");
+                    closeExam();
+                } else alert("Verification Failed: " + data.message);
+            } catch(e) { alert("Network Error. Chart not saved. Please try again."); }
+            hideLoader();
+        }
+    </script>
+</body>
+</html>
